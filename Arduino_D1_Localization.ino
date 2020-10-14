@@ -16,21 +16,23 @@
  *  - calcualte angular velocities of each wheel
  */
 
-#include <Encoder.h>  // Downloaded from https://www.pjrc.com/teensy/td_libs_Encoder.html 
-
 /**************************************** PIN DEFINITIONS ****************************************/ 
 /* RIGHT MOTOR */
 #define R_PWM           9            // PWM (black)
 #define R_SIGN          7            // direction (red)
 #define A_RW            2            // channel A, ISR (yellow)  
-#define B_RW            12           // channel B (white)
+#define B_RW            6            // channel B (white)
 
 /* LEFT MOTOR */
 #define L_PWM           10           // PWM (black)
 #define L_SIGN          8            // direction (red)
 #define A_LW            3            // channel A, ISR (orange)
 #define B_LW            11           // channel B (white)
-#define Vcc2            4            // secondary 5V supply for encoder
+#define Vcc2            5            // secondary 5V supply for encoder
+
+/* MOTOR SHIELD */
+#define Enable          4            // HIGH - motor to receive current
+#define STATUS          12           // Uknown pin on motor shield, DO NOT USE
 
 /**************************************** GLOBAL CONSTANTS ***************************************/ 
 #define batteryVoltage  8            // [V]      voltage available from battery
@@ -38,11 +40,13 @@
 #define micro           1000000      // [s]      conversion from micros to seconds  
 
 /************************************* VARIABLE DECLARATIONS *************************************/ 
-const double  fullRotation = 6.22;    // [rad]  approx angular position after full rotation
-const int     sampleTime = 50;        // [ms]   sampling time 
+const double  fullRotation = 6.22;      // [rad]  approx angular position after full rotation
+const int     sampleTime = 50;          // [ms]   sampling time 
 
 /* RIGHT MOTOR */
-bool          updateRW = true;          // flag to detect if right wheel variables changed 
+bool          updateRW = false;         // flag to detect if right wheel variables changed
+static int    R_AChannel;               // [1 or 0]   channel A of RW encoder 
+static int    R_BChannel;               // [1 or 0]   channel B or RW encoder
 long          R_countPrev = -999;       // [counts]   prev encoder counts
 long          R_countNow = 0;           // [counts]   current encoder counts
 double        R_angPosPrev = 0.0;       // [rad]      prev angular position
@@ -58,7 +62,9 @@ bool          R_dir = 1;                // controls the direction of rotation
 double        R_motorVotlage = 0.0;     // [V]  control voltage from PID
 
 /* LEFT MOTOR^ */
-bool          updateLW = true;          // flag to detect if left wheel variables changed
+bool          updateLW = false;         // flag to detect if left wheel variables changed
+static int    L_AChannelNow;            // [1 or 0]   channel A of RW encoder 
+static int    L_BChannelNow;            // [1 or 0]   channel B or RW encoder
 long          L_countPrev = -999;       // [counts]   prev encoder counts
 long          L_countNow = 0;           // [counts]   current encoder counts
 double        L_angPosPrev = 0.0;       // [rad]      prev angular position
@@ -88,7 +94,7 @@ unsigned long deltaT = 0;                                                 // [s]
 
 /************************************* VARIABLE TO MANIPULATE *************************************/ 
 const double  radius = 0.075;               // [m]  radius of wheels
-const double  baseline = .245;             // [m]  width of robot
+const double  baseline = .245;              // [m]  width of robot
 
 /************************************* DESIRED TASK VARIABLES ************************************/
  
@@ -97,13 +103,15 @@ void calculatePosition();             // update x, y, phi of robot
 void updateRightWheel();              // update angPos, angVel, and linVel of right wheel
 void updateLeftWheel();               // update angPos, angVel, and linVel of left wheel
 
-/********************************************* SETUP *********************************************/ 
-Encoder rightWheel(A_RW, B_RW); Encoder leftWheel(A_LW, B_LW);  // init encoder library for wheels
-
+/********************************************* SETUP *********************************************/
 void setup() {
+  pinMode(Enable, OUTPUT); digitalWrite(Enable, HIGH);            // ensure motors get current
   pinMode(Vcc2, OUTPUT); digitalWrite(Vcc2, HIGH);                // secondary Vcc = 5V 
   pinMode(R_PWM, OUTPUT); pinMode(L_PWM, OUTPUT);                 // setting PWM as output
   pinMode(R_SIGN, OUTPUT); pinMode(L_SIGN, OUTPUT);               // setting signs as output
+  
+  pinMode(A_RW, INPUT_PULLUP); pinMode(B_RW, INPUT_PULLUP);       // setting channel A and B of right wheel to be pullup resistors
+  pinMode(A_LW, INPUT_PULLUP); pinMode(B_LW, INPUT_PULLUP);       // setting channel A and B of left wheel to be pull up resistors
 
   attachInterrupt(digitalPinToInterrupt(A_RW), updateRW_countsISR, CHANGE);   // ISR monitor changes to right wheel
   attachInterrupt(digitalPinToInterrupt(A_LW), updateLW_countsISR, CHANGE);   // ISR monitor changes to left wheel
@@ -121,13 +129,13 @@ void loop() {
   }
   
   if(updateRW) {          /* update angPos, angVel, and linVel of right wheel */
+    //Serial.print("R count: "); Serial.println(R_countNow);
     updateRightWheel();
-    Serial.print("R count: "); Serial.println(R_countNow);
   }
   
   if(updateLW) {          /* update angPos, angVel, and linVel of left wheel */
     updateLeftWheel();
-    Serial.print("L count: "); Serial.println(L_countNow);
+    //Serial.print("L count: "); Serial.println(L_countNow);
   }
 
 }
@@ -135,17 +143,28 @@ void loop() {
 /* update right encoder count values */
 void updateRW_countsISR() {
     enterISR = true;                      // set flag to indicate enter ISR 
-    updateRW = true;
-    R_countPrev = R_countNow;
-    R_countNow = rightWheel.read();
+    updateRW = true;                      // set flag to indicate RW characteritics to be updated
+    R_countPrev = R_countNow;             // set previous count value to  the current count value that has not been updated 
+
+    R_AChannelNow = digitalRead(A_RW);    // read in Channel A 
+    R_BChannelNow = digitalRead(B_RW);    // read in Channel B
+
+    if (R_AChannelNow == R_BChannelNow) R_countNow +=2;
+    else R_countNow -=2;
 }
 
 /* update left encoder count values */
 void updateLW_countsISR() {
     enterISR = true;                      // set flag to indicate enter ISR 
-    updateLW = true;
-    L_countPrev = L_countNow;
-    L_countNow = leftWheel.read();
+    updateLW = true;                      // set flag to indicate LW characteritics to be updated
+    L_countPrev = L_countNow;             // set previous count value to  the current count value that has not been updated 
+
+    L_AChannelNow = digitalRead(A_LW);    // read in Channel A 
+    L_BChannelNow = digitalRead(B_LW);    // read in Channel B
+
+    if (L_AChannelNow == L_BChannelNow) L_countNow -=2;
+    else L_countNow +=2;    
+
 }
 
 /* update right wheel velocities and positions */
@@ -157,9 +176,9 @@ void updateRightWheel() {
           if(R_countNow != R_countPrev) {
                 R_angPosNow = (2.0*PI*(double)R_countNow)/(double)N;
                 
-                if (abs(R_angPosNow) > fullRotation) {                              // if the wheel has gone a full rotation
-                    rightWheel.write(0); R_countNow = 0; R_angPosNow = 0.0;             // reset characteristics to zero
-                    R_angVelNow = R_angVelPrev;                                         // current angVel set to previous angVel
+                if (abs(R_countNow) > N) {                              // if the wheel has gone a full rotation
+                    R_countNow = 0; R_angPosNow = 0.0                       // reset characteristics to zero
+                    R_angVelNow = R_angVelPrev;                             // current angVel set to previous angVel
                 } else {
                   R_angVelNow = (R_angPosNow - R_angPosPrev)/((double)R_deltaT);  // else, calculate angVel based on angPos
                 }
@@ -184,9 +203,9 @@ void updateLeftWheel() {
           if(L_countNow != L_countPrev) {
                 L_angPosNow = (2.0*PI*(double)L_countNow)/(double)N;
                 
-                if (abs(L_angPosNow) > fullRotation) {                              // if the wheel has gone a full rotation
-                    leftWheel.write(0); L_countNow = 0; L_angPosNow = 0.0;             // reset characteristics to zero
-                    L_angVelNow = L_angVelPrev;                                         // current angVel set to previous angVel
+                if (abs(L_countNow) > N) {                             // if the wheel has gone a full rotation
+                    L_countNow = 0; L_angPosNow = 0.0                       // reset characteristics to zero
+                    L_angVelNow = L_angVelPrev;                             // current angVel set to previous angVel
                 } else {
                   L_angVelNow = (L_angPosNow - L_angPosPrev)/((double)L_deltaT);  // else, calculate angVel based on angPos
                 }
@@ -201,7 +220,7 @@ void updateLeftWheel() {
     }
 }
 
-/* Calculate new position and angle */
+/* Calculate new position and angle of robot*/
 void calculatePosition() {
   timeNow = micros()/(unsigned long)micro;        // capture time enter loop
   deltaT = timeNow - timePrev;                    // calculate time since last enter
@@ -212,7 +231,7 @@ void calculatePosition() {
   phi_now = phi_prev + (double)deltaT*(radius/baseline)*(R_linVel-L_linVel);
 
   /* Print statements */
-  //Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
+  Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
            
   /* set previous values to current values */
   x_prev = x_now;
@@ -222,69 +241,3 @@ void calculatePosition() {
 
   timePrev = micros()/(double)micro;   
 }
-
-/* changes to the right wheel */
-/*void RW_ISR() {
-  enterISR = true;                                // set flag to monitor enter ISR true
-  
-  R_timeNow = micros()/(unsigned long)micro;      // capture the time enter ISR
-  R_deltaT = R_timeNow - R_timePrev;              // calculate time since last ISR
-
-  if (R_deltaT > tooQuick){
-      R_countNow = rightWheel.read();                 // read in the current encoder counts
-      Serial.print("R: "); Serial.println(R_countNow);
-      if (R_countNow != R_countPrev) {                // if there is a change to the encoder counts
-        
-          R_angPosNow = (2.0*PI*(double)R_countNow)/(double)N;                // calculate angular position of wheel
-          if (abs(R_angPosNow) > fullRotation) {                              // if the wheel has gone a full rotation
-              rightWheel.write(0); R_countNow = 0; R_angPosNow = 0.0;             // reset characteristics to zero
-              R_angVelNow = R_angVelPrev;                                         // current angVel set to previous angVel
-          } else {
-              R_angVelNow = (R_angPosNow - R_angPosPrev)/((double)R_deltaT);  // else, calculate angVel based on angPos
-          }
-            
-          R_linVel = radius*R_angVelNow;              // calculate linear velocity
-    
-          // set prev values to current values
-          R_countPrev = R_countNow;              
-          R_angPosPrev = R_angPosNow;             
-          R_angVelPrev = R_angVelNow; 
-          R_timePrev = micros()/(unsigned long)micro; // capture time leaving ISR
-      }
-  }
-}*/
-
-/* changes to the left wheel */
-/*void LW_ISR() {
-  enterISR = true;                                // set flag to monitor enter ISR true
-  
-  L_timeNow = micros()/(unsigned long)micro;      // capture the time enter ISR
-  L_deltaT = L_timeNow - L_timePrev;              // calculate time since last ISR
-
-  if (L_deltaT > tooQuick) {
-  
-    L_countNow = leftWheel.read();                 // read in the current encoder counts
-    Serial.print("L: "); Serial.println(L_countNow);
-      if (L_countNow != L_countPrev) {                // if there is a change to the encoder counts
-        
-          L_angPosNow = (2.0*PI*(double)L_countNow)/(double)N;                // calculate angular position of wheel
-      
-          if (abs(L_angPosNow) > fullRotation) {                              // if the wheel has gone a full rotation
-              leftWheel.write(0); L_countNow = 0; L_angPosNow = 0.0;             // reset characteristics to zero
-              L_angVelNow = L_angVelPrev;                                         // current angVel set to previous angVel
-          } else {
-              L_angVelNow = (L_angPosNow - L_angPosPrev)/((double)L_deltaT);  // else, calculate angVel based on angPos
-          }
-            
-          L_linVel = radius*L_angVelNow;              // calculate linear velocity
-    
-          // set prev values to current values
-          L_countPrev = L_countNow;              
-          L_angPosPrev = L_angPosNow;             
-          L_angVelPrev = L_angVelNow; 
-          L_timePrev = micros()/(unsigned long)micro; // capture time leaving ISR
-      }
-  }
-
-}
-*/
