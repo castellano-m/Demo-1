@@ -27,7 +27,6 @@ def aruco_location():
     y_distance = (corners[0][0][1][1] - corners[0][0][0][1]) ** 2
     image_distance = corners[0][0][1][0] - corners[0][0][0][0]
     distance = fov * real_distance / image_distance
-    # Calculate center of marker based on four corners
     reference1 = math.sqrt((corners[0][0][3][0] - corners[0][0][0][0])**2 +
                            (corners[0][0][3][1] - corners[0][0][0][1])**2) + corners[0][0][0][0]
                            
@@ -37,7 +36,7 @@ def aruco_location():
     imageCenter = (reference1 / 2) + (reference2 / 2) / 2
     print(corners[0][0][0][0])
     print(corners[0][0][0][1])
-    
+    # Calculate center of marker based on four corners
     x_cord = ((((corners[0][0][1][0] - corners[0][0][0][0])/2)
                + ((corners[0][0][3][0] - corners[0][0][2][0])/2)) / 2) + corners[0][0][0][0]
     
