@@ -2,13 +2,11 @@
  * Date: October 12, 2020
  *  
  * Title: Demo 1 - Localization  
- *  - Motor RW:   R_PWM = pin 9 (black); SIGN1 = pin 7 (red) *jumper pins
- *                Channel A (yellow) = pin 2 (ISR)
+ *  - Motor RW:   Channel A (yellow) = pin 2 (ISR)
  *                Channel B (white) = pin 12
  *                Vcc (blue) = 5V on Arduino
  *              
- *  - Motor LW:   L_PWM = pin 10 (black); SIGN2 = pin 8 (red)
- *                Channel A (yellow) = pin 3(ISR) 
+ *  - Motor LW:   Channel A (yellow) = pin 3(ISR) 
  *                Channel B (white) = pin 13
  *                Vcc (Blue) = pin 4 (set high)    
  *                
@@ -17,15 +15,15 @@
  */
 
 /**************************************** PIN DEFINITIONS ****************************************/ 
-/* RIGHT MOTOR */
+/* RIGHT MOTOR - Motor B */
 #define R_PWM           9            // PWM (black)
-#define R_SIGN          7            // direction (red)
+#define R_SIGN          8            // direction (red)
 #define A_RW            2            // channel A, ISR (yellow)  
 #define B_RW            6            // channel B (white)
 
-/* LEFT MOTOR */
+/* LEFT MOTOR - Motor A */
 #define L_PWM           10           // PWM (black)
-#define L_SIGN          8            // direction (red)
+#define L_SIGN          7            // direction (red)
 #define A_LW            3            // channel A, ISR (orange)
 #define B_LW            11           // channel B (white)
 #define Vcc2            5            // secondary 5V supply for encoder
@@ -58,8 +56,7 @@ unsigned long R_timePrev = 0;           // [s]        prev time
 unsigned long R_timeNow = 0;            // [s]        current time
 unsigned long R_deltaT = 0;             // [s]        difference of current - prev time
 
-bool          R_dir = 1;                // controls the direction of rotation
-double        R_motorVotlage = 0.0;     // [V]  control voltage from PID
+
 
 /* LEFT MOTOR^ */
 bool          updateLW = false;         // flag to detect if left wheel variables changed
@@ -76,25 +73,34 @@ unsigned long L_timePrev = 0;           // [s]        prev time
 unsigned long L_timeNow = 0;            // [s]        current time
 unsigned long L_deltaT = 0;             // [s]        difference of current - prev time
 
-bool          L_dir = 1;                // controls the direction of rotation
-double        L_motorVoltage = 0.0;     // [V]  control voltage from PID
 
 /* ROBOT */
 /* phi = angle w/ respect to x-axis */
-const unsigned long  tooQuick =0.1;                                       // [ms]   50ms range if enter ISR too quickly
+/*  R L 
+ *  0 0 Forward
+ *  0 1 CCW
+ *  1 0 CW
+ *  1 1 B
+*/
+const unsigned long  tooQuick =0.001;                                     // [s]   1 ms range if enter ISR too quickly
 bool          enterISR = true;                                            // flag to detect if motor variables changed
-double        x_prev = 0.0; double y_prev = 0.0; double phi_prev = 0.0;   // [m]    prev positions
-double        x_now = 0.0; double y_now = 0.0; double phi_now = 0.0;      // [m]    current positions
+double        x_prev = 0.0; double y_prev = 0.0; double phi_prev = 0.0;   // [in]    prev positions
+double        x_now = 0.0; double y_now = 0.0; double phi_now = 0.0;      // [in]    current positions
 unsigned long timePrev = 0;                                               // [s]    time exit main loop
 unsigned long timeNow = 0;                                                // [s]    time enter main loop
 unsigned long deltaT = 0;                                                 // [s]    time diff b/t exit and enter   
+
+bool          R_dir = 0;                // controls the direction of rotation
+bool          L_dir = 0;                // controls the direction of rotation
+double        R_motorVotlage = 0.0;     // [V]  control voltage from PID
+double        L_motorVoltage = 0.0;     // [V]  control voltage from PID
 
 /* CONTROLS */
 /* put control, gain values, etc. here */
 
 /************************************* VARIABLE TO MANIPULATE *************************************/ 
-const double  radius = 0.075;               // [m]  radius of wheels
-const double  baseline = .245;              // [m]  width of robot
+const double  radius = 2.952;               // [in]  radius of wheels
+const double  baseline = 10.827;            // [in]  width of robot
 
 /************************************* DESIRED TASK VARIABLES ************************************/
  
@@ -118,7 +124,7 @@ void setup() {
   
   Serial.begin(115200);                                           // initialize serial monitor
 
-  //Serial.print("x [m]"); Serial.print("\t"); Serial.print("y [m]"); Serial.print("\t"); Serial.println("phi [rad]");
+  //Serial.print("x [in]"); Serial.print("\t"); Serial.print("y [in]"); Serial.print("\t"); Serial.println("phi [in]");
 
   int timeStep = millis();
   while(millis() < (timeStep + 1000));                            // wait 1 second before applying voltage step
@@ -129,11 +135,20 @@ void setup() {
 
 void loop() {
 
-  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);      // assign direction to motors
-  analogWrite(R_PWM, 127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
+   digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);      // assign direction to motors
+  
+  if(millis() > 2800){
+    analogWrite(R_PWM, 0);                    // let motor run for 1 s
+    analogWrite(L_PWM, 0);                    // let motor run for 1 s
+  } else {
+    analogWrite(R_PWM, 127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
+  }
   
   if(enterISR) {          /* update x, y, phi of robot */
     calculatePosition(); 
+      /* Print statements */
+      //Serial.print("RW: "); Serial.print(R_countNow); Serial.print("\t"); Serial.print("LW: "); Serial.print(L_countNow);
+      //Serial.print("\t"); Serial.print("X: "); Serial.println(x_now); //Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
   }
   
   if(updateRW) {          /* update angPos, angVel, and linVel of right wheel */
@@ -147,7 +162,7 @@ void loop() {
   }
 
   if((millis()%50 == 0) && (millis() <= 2800)){   /* sample velocity of both left and right wheels every 50 ms while time <= 2.8 s */
-    Serial.print(millis()/1000);  Serial.print("\t"); Serial.print(L_linVel); Serial.print("\t"); Serial.println(R_linVel);
+    Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print(L_linVel); Serial.print("\t"); Serial.println(R_linVel);
   }
 
 }
@@ -241,15 +256,12 @@ void calculatePosition() {
   x_now = x_prev + ((double)deltaT*double(cos(phi_prev))*(R_linVel + L_linVel))/(2.0);
   y_now = y_prev + ((double)deltaT*double(sin(phi_prev))*(R_linVel + L_linVel))/(2.0);
   phi_now = phi_prev + (double)deltaT*(radius/baseline)*(R_linVel-L_linVel);
-
-  /* Print statements */
-  Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
            
   /* set previous values to current values */
   x_prev = x_now;
   y_prev = y_now;
   phi_prev = phi_now;
   enterISR = false;
-
   timePrev = micros()/(double)micro;   
+  
 }
