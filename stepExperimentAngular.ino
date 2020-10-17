@@ -127,7 +127,7 @@ void setup() {
   
   Serial.begin(115200);                                           // initialize serial monitor
 
-  Serial.print("x [in]"); Serial.print("\t"); Serial.print("y [in]"); Serial.print("\t"); Serial.println("phi [in]");
+  //Serial.print("x [in]"); Serial.print("\t"); Serial.print("y [in]"); Serial.print("\t"); Serial.println("phi [in]");
 
   int timeStep = millis();
   while(millis() < (timeStep + 1000));                            // wait 1 second before applying voltage step
@@ -151,7 +151,7 @@ void loop() {
     calculatePosition(); 
       /* Print statements */
       //Serial.print("RW: "); Serial.print(R_countNow); Serial.print("\t"); Serial.print("LW: "); Serial.print(L_countNow); Serial.print("\t");
-     Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
+     //Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
   }
   
   if(updateRW) {          /* update angPos, angVel, and linVel of right wheel */
@@ -164,7 +164,7 @@ void loop() {
 
   if((millis()%50 == 0) && (millis() <= 2800)){   /* sample velocity of both left and right wheels every 50 ms while time <= 2.8 s */
     //Serial.print(L_angPosNow); Serial.print("\t"); Serial.print(L_deltaT); Serial.print("\t"); Serial.print(R_angPosNow); Serial.print("\t"); Serial.print(R_deltaT); Serial.print("\t"); 
-    //Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print(L_angVelNow); Serial.print("\t"); Serial.println(R_angVelNow);
+    Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print(L_angVelNow); Serial.print("\t"); Serial.println(R_angVelNow);
   }
 
 }
