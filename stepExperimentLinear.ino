@@ -162,7 +162,7 @@ void loop() {
   }
 
   if((millis()%50 == 0) && (millis() <= 2800)){   /* sample velocity of both left and right wheels every 50 ms while time <= 2.8 s */
-    Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print(L_linVel); Serial.print("\t"); Serial.println(R_linVel);
+    Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print(L_angVelNow); Serial.print("\t"); Serial.println(R_angVelNow);
   }
 
 }
