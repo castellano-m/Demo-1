@@ -19,7 +19,8 @@ import math
 global quadrant, aruco_dict, parameters, frame, corners, ids, rejectedImgPoints, frame_markers
 # Turn on video
 video = cv2.VideoCapture(0)
-        
+   
+# Check units used for Angle and Distance calculations
 def aruco_location():
     fov = .12 *1280*7 #3.05mm but in inches
     real_distance = 5.5 # 5.5 inch
@@ -34,26 +35,12 @@ def aruco_location():
                            (corners[0][0][2][1] - corners[0][0][1][1])**2) + corners[0][0][2][0]
                            
     imageCenter = (reference1 / 2) + (reference2 / 2) / 2
-    print(corners[0][0][0][0])
-    print(corners[0][0][0][1])
     # Calculate center of marker based on four corners
     x_cord = ((((corners[0][0][1][0] - corners[0][0][0][0])/2)
                + ((corners[0][0][3][0] - corners[0][0][2][0])/2)) / 2) + corners[0][0][0][0]
     
     y_cord = ((((corners[0][0][1][1] - corners[0][0][0][1])/2)
                + ((corners[0][0][3][1] - corners[0][0][2][1])/2)) / 2) + corners[0][0][0][1]
-    # Quad 1
-    if ((x_cord < 320.0) and (y_cord < 180.0)):
-        quadrant = 1
-    # Quad 2
-    elif ((x_cord >= 320.0) and (y_cord < 180.0)):
-        quadrant = 2
-    # Quad 3
-    elif ((x_cord < 320.0) and (y_cord >= 180.0)):
-        quadrant = 3
-    # Quad 4
-    elif ((x_cord >= 320.0) and (y_cord >= 180.0)):
-        quadrant = 4
     center = (1280/2) - imageCenter
     # Measurers angle from [30,0] from left side to right side of view
     angle = math.atan(center / fov) * 180 / 3.14
@@ -61,7 +48,6 @@ def aruco_location():
     angle = (angle - 15) * -1
     print("Real Distance: ", distance)
     print("Angle: " , angle)
-    print(quadrant)
     
 while True:
     # Get current frame and convert to grayscale. Print frame
@@ -77,9 +63,6 @@ while True:
     if ids != None :   
         cv2.imshow("Capturing",frame_markers)
         aruco_location()
-    else:
-        quadrant = 0
-        print(quadrant)
 
 # Stop recoring if 'q' is pressed
     key = cv2.waitKey(1)
