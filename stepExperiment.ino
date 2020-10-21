@@ -1,17 +1,14 @@
 /* Name: Madison Heeg and Andrew Rouze
  * Date: October 12, 2020
  *  
- * Title: Demo 1 - Localization  
+ * Title: StepExperimentAngular
  *  - Motor RW:   Channel A (yellow) = pin 2 (ISR)
  *                Channel B (white) = pin 12
  *                Vcc (blue) = 5V on Arduino
  *              
  *  - Motor LW:   Channel A (yellow) = pin 3(ISR) 
  *                Channel B (white) = pin 13
- *                Vcc (Blue) = pin 4 (set high)    
- *                
- * Functionality
- *  - calcualte angular velocities of each wheel
+ *                Vcc (Blue) = pin 4 (set high)
  */
 
 /**************************************** PIN DEFINITIONS ****************************************/ 
@@ -39,7 +36,6 @@
 
 /************************************* VARIABLE DECLARATIONS *************************************/ 
 const double  fullRotation = 6.22;      // [rad]  approx angular position after full rotation
-const int     sampleTime = 50;          // [ms]   sampling time 
 
 /* RIGHT MOTOR */
 static int    R_AChannelNow;            // [1 or 0]   channel A of RW encoder 
@@ -71,22 +67,14 @@ unsigned long L_deltaT = 0;             // [us]       difference of current - pr
 
 
 /* ROBOT */
-/* phi = angle w/ respect to x-axis */
-/*  R L 
- *  0 0 Forward
- *  0 1 CCW
- *  1 0 CW
- *  1 1 B
- *  
- *  CCW = negative rotational Velocity
- *  
-*/
-//const unsigned long  tooQuick = 1;                                          // [us]   us range if enter ISR too quickly
+/*  phi = angle w/ respect to x-axis */
 double        x_prev = 0.0; double y_prev = 0.0; double phi_prev = 0.0;       // [in]   starting positions
 double        x_now = 0.0; double y_now = 0.0; double phi_now = 0.0;          // [in]   current positions
 unsigned long timePrev = 0;                                                   // [s]    time exit main loop
 unsigned long timeNow = 0;                                                    // [s]    time enter main loop
 unsigned long deltaT = 0;                                                     // [s]    time diff b/t exit and enter
+
+double        scalePWM = .94;
 
 double        J_linVel = 0.0;                                                 // [in/s]     linear velocity                 
 double        J_rotVel = 0.0;
@@ -94,8 +82,15 @@ double        J_rotVel = 0.0;
 //double x_posCalib = 4.16;                                                    // [in] calibration for front of camera to be 0 origin
 //double y_posCalib = 4.16;                                                    // [in] calibration for front of camera to be 0 origin 
 
+/*  R L 
+ *  0 0 Forward
+ *  0 1 CCW
+ *  1 0 CW
+ *  1 1 B
+ *  CCW = negative rotational velocity
+*/
 bool          R_dir = 0;                // controls the direction of rotation
-bool          L_dir = 1;                // controls the direction of rotation
+bool          L_dir = 0;                // controls the direction of rotation
 double        R_motorVotlage = 0.0;     // [V]  control voltage from PID
 double        L_motorVoltage = 0.0;     // [V]  control voltage from PID
 
@@ -135,10 +130,10 @@ void setup() {
   //Serial.print("time [ms]");Serial.print("\t"); Serial.print("L_angVel[rad/s]"); Serial.print("\t"); Serial.println("R_angVel [rad/s]");
   Serial.print("time [ms]");Serial.print("\t"); Serial.print("J_linVel[in/s]"); Serial.print("\t"); Serial.println("J_rotVel[rad/s]");  
 
-  //int timeStep = millis();
-  //while(millis() < (timeStep + 1000));                            // wait 1 second before applying voltage step
+  int timeStep = millis();
+  while(millis() < (timeStep + 1000));                            // wait 1 second before applying voltage step
   digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);      // assign direction to motors
-  analogWrite(R_PWM, 127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
+  analogWrite(R_PWM, scalePWM*127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
   
 }
 
@@ -151,7 +146,7 @@ void loop() {
     analogWrite(R_PWM, 0);                    // let motor run for 1 s
     analogWrite(L_PWM, 0);                    // let motor run for 1 s
   } else {
-    analogWrite(R_PWM, 127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
+    analogWrite(R_PWM, 127);      analogWrite(L_PWM, scalePWM*127);          // write 50% duty cycle to each motor
   }
        
     calculatePositionandVel();        /* update x, y, phi of robot */
@@ -286,36 +281,3 @@ void calculatePositionandVel() {
   //timePrev = micros();   
   
 }
-
-/*void updateWheels() {
-
-    if ((L_deltaT > tooQuick) && (R_deltaT > tooQuick)){
-          if((L_countNow != L_countPrev) && (R_countNow != R_countPrev)) {
-                L_angPosNow = (2.0*PI*(double)L_countNow)/(double)N;
-                R_angPosNow = (2.0*PI*(double)R_countNow)/(double)N;
-                
-                if (abs(L_angPosNow) > fullRotation) {                            // if the wheel has gone a full rotation
-                    L_countNow = 0; L_angPosNow = 0.0;                            // reset characteristics to zero
-                    L_angVelNow = L_angVelPrev;                                   // current angVel set to previous angVel
-                } else {
-                  L_angVelNow = ((double)L_angPosNow - (double)L_angPosPrev)/((double)L_deltaT/(double)micro);  // else, calculate angVel based on angPos
-                }
-
-                if (abs(R_angPosNow) > fullRotation) {
-                  R_countNow = 0; R_angPosNow = 0.0; 
-                  R_angVelNow = R_angVelPrev;
-                } else {
-                  R_angVelNow = ((double)R_angPosNow - (double)R_angPosPrev)/((double)R_deltaT/(double)micro);
-                }
-                
-                L_linVel = radius*L_angVelNow;              // calculate linear velocity
-                R_linVel = radius*L_angVelNow;
-
-                L_angPosPrev = L_angPosNow; 
-                R_angPosPrev = R_angPosNow;            
-                L_angVelPrev = L_angVelNow;
-                R_angVelPrev = R_angVelNow; 
-                
-          }
-    }
-}*/
