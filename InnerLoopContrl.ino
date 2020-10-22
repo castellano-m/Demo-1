@@ -109,20 +109,25 @@ const double  radius = 2.952;               // [in]  radius of wheels
 const double  baseline = 10.827;            // [in]  width of robot
 
 /************************************* DESIRED TASK VARIABLES ************************************/
-double desiredXPos       = 9;  // inches
-double loopTime          = 0;
-int    desiredCounts     = (desiredXPos/(2*PI*radius))*N;
-double desireAngPos      = (double)desiredCounts*2.0*PI/(double)N;
-double angularPos_now    = 0;
-double motorVoltage      = 0;
-double dutyCycle         = 0;
+double desiredXPos              = 9;  // inches
+double loopTime                 = 0;
+int    desiredCounts            = (desiredXPos/(2*PI*radius))*N;
+double desireForwardAngPos      = (double)desiredCounts*2.0*PI/(double)N;
+double angularPos_now           = 0;
+double motorVoltage             = 0;
+double dutyCycle                = 0;
+
+double phi_des                  = PI;         // radians
+double desireRotatAngPos        = 2*phi_des;  // radians
+
 
 
 /************************************** FUNCTION PROTOTYPES **************************************/ 
-void calculatePositionandVel();       // update x, y, phi of robot
-void updateRightWheel();              // update angPos, angVel, and linVel of right wheel
-void updateLeftWheel();               // update angPos, angVel, and linVel of left wheel
-void updateWheels();                  // update angPos, angVel, and linVel of both wheels
+void piController(char controlType, double desiredAng, double actualAng);   // control motor voltages
+void calculatePositionandVel();                                             // update x, y, phi of robot
+void updateRightWheel();                                                    // update angPos, angVel, and linVel of right wheel
+void updateLeftWheel();                                                     // update angPos, angVel, and linVel of left wheel
+void updateWheels();                                                        // update angPos, angVel, and linVel of both wheels
 
 /********************************************* SETUP *********************************************/
 void setup() {
@@ -151,10 +156,43 @@ void loop() {
   
   Serial.print("D_Counts: "); Serial.print(desiredCounts); Serial.print("\t"); Serial.print("A_counts "); Serial.print(R_countNow); Serial.print("\t"); Serial.print("D_Xpos: "); Serial.print(desiredXPos); Serial.print("\t"); Serial.print("A_XPos "); Serial.print(x_now);
   Serial.print("\t"); Serial.print("L_angPrev: "); Serial.print(L_angPosPrev); Serial.print("\t"); Serial.print("\t"); Serial.print("L_angPos: "); Serial.print(L_angPosNow); Serial.print("\t"); Serial.print("L_angVel: "); Serial.print(L_angVelNow); Serial.print("\n");
-  
-  angularPos_now = R_angPosNow;
 
-  forwardError = (double)desireAngPos - (double)angularPos_now;
+  /* implement PI controller */
+  angularPos_now = R_angPosNow;                             // PI controller uses right wheel's angular position for reference
+  if(phi_now == phi_des){                                   // if robot has been rotated to correct angle
+    piController('f', desireForwardAngPos, angularPos_now); // drive to correct forward position
+  } else {                                                  // else
+    piController('r', desireRotatAngPos, angularPos_now);   // rotate robot to correct angle      
+  }
+
+  /*forwardError = (double)desireAngPos - (double)angularPos_now;
+
+  fErrorInteg += forwardError*(deltaT/(double)micro);
+  motorVoltage = (forwardError*fkProp) + (fkInteg*fErrorInteg);
+
+  if(abs(motorVoltage) > (double)batteryVoltage)  motorVoltage = (double)batteryVoltage;
+  dutyCycle = ((abs(motorVoltage)/batteryVoltage)) * (double)255;
+
+  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);
+  analogWrite(R_PWM, dutyCycle);  analogWrite(L_PWM, scaleL_PWM*dutyCycle); */
+  
+
+}
+
+/********************************************* FUNCTIONS *****************************************/
+
+/* control wheel velocity */
+void piController(char controlType, double desiredAng, double actualAng){
+  
+  if(controlType == 'f'){                 // drive robot forward
+    R_dir = 0;
+    L_dir = 0;
+  } else if(controlType == 'r'){          // rotate robot
+    R_dir = 0;
+    L_dir = 1;
+  }
+
+  forwardError = (double)desiredAng - (double)actualAng;
 
   fErrorInteg += forwardError*(deltaT/(double)micro);
   motorVoltage = (forwardError*fkProp) + (fkInteg*fErrorInteg);
@@ -164,10 +202,8 @@ void loop() {
 
   digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);
   analogWrite(R_PWM, dutyCycle);  analogWrite(L_PWM, scaleL_PWM*dutyCycle);
-
+  
 }
-
-/********************************************* FUNCTIONS *****************************************/
 
 /* update right encoder count values */
 void updateRW_countsISR() {
