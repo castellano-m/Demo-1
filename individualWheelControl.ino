@@ -173,22 +173,11 @@ void loop() {
   /* implement PI controller */
   //angularPos_now = R_angPosNow;                             // PI controller uses right wheel's angular position for reference
   //if(phi_now == phi_des){                                   // if robot has been rotated to correct angle
-  leftPiController(desireForwardAngPos, L_angPosNow); // drive to correct forward position
-  rightPiController(desireForwardAngPos, R_angPosNow);
+  leftPiController(desireForwardAngPos, L_angPosNow);         // drive left wheel to correct forward position
+  rightPiController(desireForwardAngPos, R_angPosNow);        // drive right wheel to correct forward position
   /*} else {                                                  // else
-    rotPiController(phi_des, L_angPosNow, R_angPosNow);   // rotate robot to correct angle      
+    rotPiController(phi_des, L_angPosNow, R_angPosNow);       // rotate robot to correct angle      
   }*/
-
-  /*forwardError = (double)desireAngPos - (double)angularPos_now;
-
-  fErrorInteg += forwardError*(deltaT/(double)micro);
-  motorVoltage = (forwardError*fkProp) + (fkInteg*fErrorInteg);
-
-  if(abs(motorVoltage) > (double)batteryVoltage)  motorVoltage = (double)batteryVoltage;
-  dutyCycle = ((abs(motorVoltage)/batteryVoltage)) * (double)255;
-
-  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);
-  analogWrite(R_PWM, dutyCycle);  analogWrite(L_PWM, scaleL_PWM*dutyCycle); */
   
 
 }
@@ -197,25 +186,25 @@ void loop() {
 
 /* control wheel velocity */
 void leftPiController(double desiredAng, double actualAng){
-  
-  double leftError = (double)desiredAng - (double)actualAng;
+
   static double lErrorInteg = 0;
+  double leftError = (double)desiredAng - (double)actualAng;    // calculate angular position error left wheel                                
 
-  lErrorInteg += (double)leftError*((double)deltaT/(double)micro);
-  double leftMotorVoltage = ((double)leftError*(double)lkProp) + ((double)lkInteg*(double)lErrorInteg);
+  lErrorInteg += (double)leftError*((double)deltaT/(double)micro);                                        // add error over time segment to error integral
+  double leftMotorVoltage = ((double)leftError*(double)lkProp) + ((double)lkInteg*(double)lErrorInteg);   // set left motor voltage using PI control
 
-  if(abs(leftMotorVoltage) > (double)batteryVoltage)  leftMotorVoltage = (double)batteryVoltage;
-  double leftDutyCycle = ((abs(leftMotorVoltage)/batteryVoltage)) * (double)255;
+  if(abs(leftMotorVoltage) > (double)batteryVoltage)  leftMotorVoltage = (double)batteryVoltage;          // check if PI output is saturated
+  double leftDutyCycle = ((abs(leftMotorVoltage)/batteryVoltage)) * (double)255;                          // convert motor voltage to PWM input
 
   
-  if (motorVoltage < 0) {
-    L_dir = 1; 
+  if (motorVoltage < 0) {   // check for wheel spin direction
+    L_dir = 1;
   } else {
     L_dir = 0;
   }
   
-  digitalWrite(L_SIGN, L_dir);
-  analogWrite(L_PWM, leftDutyCycle);
+  digitalWrite(L_SIGN, L_dir);          // assign left motor direction
+  analogWrite(L_PWM, leftDutyCycle);    // send left motor PWM signal
   
 }
 
@@ -223,37 +212,37 @@ void leftPiController(double desiredAng, double actualAng){
 void rightPiController(double desiredAng, double actualAng){
 
   static double rErrorInteg = 0;
-  double rightError = (double)desiredAng - (double)actualAng;
+  double rightError = (double)desiredAng - (double)actualAng;    // calculate angular position error left wheel
 
-  rErrorInteg += (double)rightError*((double)deltaT/(double)micro);
-  double rightMotorVoltage = ((double)rightError*(double)rkProp) + ((double)rkInteg*(double)rErrorInteg);
+  rErrorInteg += (double)rightError*((double)deltaT/(double)micro);                                         // add error over time segment to error integral
+  double rightMotorVoltage = ((double)rightError*(double)rkProp) + ((double)rkInteg*(double)rErrorInteg);   // set left motor voltage using PI control
 
-  if(abs(rightMotorVoltage) > (double)batteryVoltage)  rightMotorVoltage = (double)batteryVoltage;
-  double rightDutyCycle = ((abs(rightMotorVoltage)/batteryVoltage)) * (double)255;
+  if(abs(rightMotorVoltage) > (double)batteryVoltage)  rightMotorVoltage = (double)batteryVoltage;          // check if PI output is saturated
+  double rightDutyCycle = ((abs(rightMotorVoltage)/batteryVoltage)) * (double)255;                          // convert motor voltage to PWM input
 
   
-  if (motorVoltage < 0) {
+  if (motorVoltage < 0) {   // check for wheel spin direction
     R_dir = 1; 
   } else {
     R_dir = 0;
   }
   
-  digitalWrite(R_SIGN, R_dir);
-  analogWrite(R_PWM, rightDutyCycle);
+  digitalWrite(R_SIGN, R_dir);          // assign left motor direction
+  analogWrite(R_PWM, rightDutyCycle);    // send left motor PWM signal
   
 }
 
 /* control robot rotation velocity */
 void rotPiController(double desiredPhi, double rightAngNow, double leftAngNow){
   
-  double rotationalError = (double)desiredPhi - (double)phi_now;
-  double leftDesAng = 2*desiredPhi;     // convert robot radians to left wheel radians
-  double rightDesAng = 2*desiredPhi;    // convert robot radians to right wheel radians
+  double rotationalError = (double)desiredPhi - (double)phi_now;  // calculate robot angular error
+  double leftDesAng = 2*desiredPhi;                               // convert robot radians to left wheel radians
+  double rightDesAng = 2*desiredPhi;                              // convert robot radians to right wheel radians
 
-  if (desiredPhi >= PI){
-    leftPiController(-leftDesAng, leftAngNow);
+  if (desiredPhi >= PI){                            // if desiredPhi is between PI and 2*PI, turn robot CCW
+    leftPiController(-leftDesAng, leftAngNow);// Hopefully the technique of inputting a negative desired angular position works, I don't think we've done it before
     rightPiController(rightDesAng, rightAngNow);
-  } else {
+  } else {                                          // else spin robot CW
     leftPiController(leftDesAng, leftAngNow);
     rightPiController(-rightDesAng, rightAngNow);    
   }
