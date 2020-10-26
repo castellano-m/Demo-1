@@ -21,7 +21,7 @@
 #define L_PWM           9           // PWM (black)
 #define L_SIGN          7            // direction (red)
 #define A_LW            3            // channel A, ISR (orange)
-#define B_LW            0           // channel B (white)
+#define B_LW            11           // channel B (white)
 #define Vcc2            5            // secondary 5V supply for encoder
 
 /* MOTOR SHIELD */
@@ -37,8 +37,8 @@
 const double  fullRotation = 6.22;      // [rad]  approx angular position after full rotation
 
 /* RIGHT MOTOR */
-static int    R_AChannelNow;            // [1 or 0]   channel A of RW encoder 
-static int    R_BChannelNow;            // [1 or 0]   channel B or RW encoder
+static int           R_AChannelNow;            // [1 or 0]   channel A of RW encoder 
+static int           R_BChannelNow;            // [1 or 0]   channel B or RW encoder
 static long          R_countNow = 0;           // [counts]   current encoder counts
 static long          R_countPrev = 0; 
 static double        R_angPosPrev = 0.0;       // [rad]      prev angular position
@@ -51,8 +51,8 @@ static unsigned long R_timeNow = 0;            // [us]       current time
 static unsigned long R_deltaT = 0;             // [us]       difference of current - prev time
 
 /* LEFT MOTOR^ */
-static int    L_AChannelNow;            // [1 or 0]   channel A of RW encoder 
-static int    L_BChannelNow;            // [1 or 0]   channel B or RW encoder
+static int           L_AChannelNow;            // [1 or 0]   channel A of RW encoder 
+static int           L_BChannelNow;            // [1 or 0]   channel B or RW encoder
 static long          L_countNow = 0;           // [counts]   current encoder counts
 static long          L_countPrev = 0;
 static double        L_angPosPrev = 0.0;       // [rad]      prev angular position
@@ -63,12 +63,13 @@ static double        L_linVel = 0.0;           // [in/s]      linear velocity
 static unsigned long L_timePrev = 0;           // [us]       prev time
 static unsigned long L_timeNow = 0;            // [us]       current time
 static unsigned long L_deltaT = 0;             // [us]       difference of current - prev time
+bool                 leftFix = true;
 
 
 /* ROBOT */
 /*  phi = angle w/ respect to x-axis */
-    static double        x_prev = 0.0; static double y_prev = 0.0; static double phi_prev = 0.0;       // [in]   starting positions
-    static double        x_now = 0.0; static double y_now = 0.0; static double phi_now = 0.0;          // [in]   current positions
+static double        x_prev = 0.0; static double y_prev = 0.0; static double phi_prev = 0.0;       // [in]   starting positions
+static double        x_now = 0.0; static double y_now = 0.0; static double phi_now = 0.0;          // [in]   current positions
 static unsigned long timePrev = 0;                                                   // [s]    time exit main loop
 static unsigned long timeNow = 0;                                                    // [s]    time enter main loop
 static unsigned long deltaT = 0;                                                     // [s]    time diff b/t exit and enter
@@ -83,7 +84,7 @@ static double        J_rotVel = 0.0;                                            
 
 /*  R L 
  *  0 0 Forward   0 1 CCW   1 0 CW    1 1 Backwards
- *  CCW = negative rotational velocity
+ *  CCW = positive rotational velocity
 */
 bool          R_dir = 0;                // controls the direction of rotation
 bool          L_dir = 0;                // controls the direction of rotation
@@ -104,12 +105,12 @@ double rkProp       = 0.81361;
 double rkInteg      = 7.94361;
 double rErrorRange  = 0.2;*/
 
-double rkProp       = 1;        // right motor proportional gain
-double rkInteg      = 0.2;      // right motor integral gain
+double rkProp       = .19;        // right motor proportional gain
+double rkInteg      = 0.013;      // right motor integral gain
 double rErrorRange  = PI/8;     // right motor error range
 
-double lkProp       = 1;        // left motor proportional gain
-double lkInteg      = 0.2;      // left motor integral gain
+double lkProp       = .192;        // left motor proportional gain
+double lkInteg      = 0.0165;      // left motor integral gain
 double lErrorRange  = PI/8;     // left motor error range
 
 /************************************* VARIABLE TO MANIPULATE *************************************/ 
@@ -117,7 +118,7 @@ const double  radius = 2.952;               // [in]  radius of wheels
 const double  baseline = 10.827;            // [in]  width of robot
 
 /************************************* DESIRED TASK VARIABLES ************************************/
-double desiredXPos              = 60;  // inches
+double desiredXPos              = 10;  // inches
 double loopTime                 = 0;
 int    desiredCounts            = (desiredXPos/(2*PI*radius))*N;
 double desireForwardAngPos      = (double)desiredCounts*2.0*PI/(double)N;
@@ -125,18 +126,22 @@ double angularPos_now           = 0;
 double motorVoltage             = 0;
 double dutyCycle                = 0;
 
-double phi_des                  = 0;         // radians
+double phi_des                  = PI;         // radians
 double desireRotatAngPos        = 2*phi_des;  // radians
+double rotErrorRange            = PI/8;                 // left motor error range
+
+bool   rotFlag                  = true;
 
 /************************************** FUNCTION PROTOTYPES **************************************/ 
 //void leftPiController(double desiredAng, double actualAng);                     // control left motor voltage
-//void rightPiController(double desiredAng, double actualAng);                    // control right motor voltage
+// void rightPiController(double desiredAng, double actualAng);                    // control right motor voltage
 void motorPiController(double leftDesiredAng, double rightDesiredAng, double leftAngNow, double rightAngNow);
 void rotPiController(double desiredPhi, double rightAngNow, double leftAngNow); // control robot rotational velocity
 void calculatePositionandVel();                                                 // update x, y, phi of robot
 void updateRightWheel();                                                        // update angPos, angVel, and linVel of right wheel
 void updateLeftWheel();                                                         // update angPos, angVel, and linVel of left wheel
 void updateWheels();                                                            // update angPos, angVel, and linVel of both wheels
+void printData();
 
 /********************************************* SETUP *********************************************/
 void setup() {
@@ -152,41 +157,36 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(A_RW), updateRW_countsISR, CHANGE);   // ISR monitor changes to right wheel
   attachInterrupt(digitalPinToInterrupt(A_LW), updateLW_countsISR, CHANGE);   // ISR monitor changes to left wheel
   
-  Serial.begin(9600);                                                       // initialize serial monitor
+  Serial.begin(115200);                                                       // initialize serial monitor
 
-  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);                 // assign direction to motors
-  analogWrite(R_PWM, 127);      analogWrite(L_PWM, scaleL_PWM*127);          // write 50% duty cycle to each motor
-
-  Serial.print("START"); 
+    if (leftFix) {
+      leftFix = false;             
+      L_angVelPrev = 0.0; 
+      L_angVelNow = 0.0;
+      L_linVel = 0.0;
+    }
   
 }
 
 /********************************************* LOOP **********************************************/
-void loop() {
-  L_angVelNow = 0; 
-  R_angVelNow = 0;     
+void loop() {     
   calculatePositionandVel();        /* update x, y, phi of robot */
   
-  //Serial.print("D_Counts: "); Serial.print(desiredCounts); Serial.print("\t"); Serial.print("A_counts "); Serial.print(R_countNow); Serial.print("\t"); Serial.print("D_Xpos: "); Serial.print(desiredXPos); Serial.print("\t"); Serial.print("A_Phi "); Serial.print(phi_now);
-  //Serial.print("\t"); Serial.print("R_angPrev: "); Serial.print(R_angPosPrev); Serial.print("\t"); Serial.print("\t"); Serial.print("R_angPos: "); Serial.print(R_angPosNow); Serial.print("\t"); Serial.print("R_angVel: "); Serial.print(R_angVelNow); Serial.print("\n");
-  Serial.print(desireForwardAngPos); Serial.print("\t"); Serial.println(R_angPosNow); 
-  
+  printData();
+    
   /* implement PI controller */
   //angularPos_now = R_angPosNow;                             // PI controller uses right wheel's angular position for reference
-  //if(phi_now == phi_des){                                   // if robot has been rotated to correct angle
-  //leftPiController(desireForwardAngPos, L_angPosNow);         // drive left wheel to correct forward position
-  //rightPiController(desireForwardAngPos, R_angPosNow);        // drive right wheel to correct forward position
-  motorPiController(desireForwardAngPos, desireForwardAngPos, L_angPosNow, R_angPosNow);
-  /*} else {                                                  // else
-    rotPiController(phi_des, L_angPosNow, R_angPosNow);       // rotate robot to correct angle      
-  }*/
+  if(rotFlag == false){                                   // if robot has been rotated to correct angle
+    motorPiController(desireForwardAngPos, desireForwardAngPos, L_angPosNow, R_angPosNow);
+  } else {                                                  // else
+    rotPiController(desireRotatAngPos, L_angPosNow, R_angPosNow);       // rotate robot to correct angle      
+  }
   
 
 }
 
 /********************************************* FUNCTIONS *****************************************/
 
-/* control wheel velocity */
 void motorPiController(double leftDesiredAng, double rightDesiredAng, double leftActualAng, double rightActualAng){
 
   static double lErrorInteg = 0;
@@ -223,6 +223,30 @@ void motorPiController(double leftDesiredAng, double rightDesiredAng, double lef
   analogWrite(R_PWM, rightDutyCycle);   // send left motor PWM signal
 }
 
+/* control wheel velocity */
+/*void leftPiController(double desiredAng, double actualAng){
+
+  static double lErrorInteg = 0;
+  double leftError = (double)desiredAng - (double)actualAng;    // calculate angular position error left wheel                                
+
+  lErrorInteg += (double)leftError*((double)deltaT/(double)micro);                                        // add error over time segment to error integral
+  double leftMotorVoltage = ((double)leftError*(double)lkProp) + ((double)lkInteg*(double)lErrorInteg);   // set left motor voltage using PI control
+
+  if(abs(leftMotorVoltage) > (double)batteryVoltage)  leftMotorVoltage = (double)batteryVoltage;          // check if PI output is saturated
+  double leftDutyCycle = ((abs(leftMotorVoltage)/batteryVoltage)) * (double)255;                          // convert motor voltage to PWM input
+
+  
+  if (motorVoltage < 0) {   // check for wheel spin direction
+    L_dir = 1;
+  } else {
+    L_dir = 0;
+  }
+  
+  digitalWrite(L_SIGN, L_dir);          // assign left motor direction
+  analogWrite(L_PWM, leftDutyCycle);    // send left motor PWM signal
+  
+}*/
+
 /* control right wheel velocity */
 /*void rightPiController(double desiredAng, double actualAng){
 
@@ -250,19 +274,25 @@ void motorPiController(double leftDesiredAng, double rightDesiredAng, double lef
 /* control robot rotation velocity */
 void rotPiController(double desiredPhi, double rightAngNow, double leftAngNow){
   
-  double rotationalError = (double)desiredPhi - (double)phi_now;  // calculate robot angular error
-  double leftDesAng = 2*desiredPhi;                               // convert robot radians to left wheel radians
-  double rightDesAng = 2*desiredPhi;                              // convert robot radians to right wheel radians
+  double leftrotError = (double)desiredPhi - (double)leftAngNow;  // calculate robot angular error
+  double rightrotError = (double)desiredPhi - (double)rightAngNow;  // calculate robot angular error
+
+  if ((leftrotError < rotErrorRange) && (rightrotError < rotErrorRange)) {
+    rotFlag = false; 
+    return; 
+  }
 
   if (desiredPhi >= PI){                            // if desiredPhi is between PI and 2*PI, turn robot CCW
-    motorPiController(-leftDesAng, rightDesAng, leftAngNow, rightAngNow);
+    motorPiController(-desiredPhi, desiredPhi, leftAngNow, rightAngNow);
     //leftPiController(-leftDesAng, leftAngNow);// Hopefully the technique of inputting a negative desired angular position works, I don't think we've done it before
     //rightPiController(rightDesAng, rightAngNow);
   } else {                                          // else spin robot CW
-    motorPiController(leftDesAng, -rightDesAng, leftAngNow, rightAngNow);
+    motorPiController(desiredPhi, -desiredPhi, leftAngNow, rightAngNow);
     //leftPiController(leftDesAng, leftAngNow);
     //rightPiController(-rightDesAng, rightAngNow);    
   }
+
+ 
   
 }
 
@@ -317,7 +347,8 @@ void updateRightWheel() {
 
 /* update left wheel velocities and positions */
 void updateLeftWheel() {
-    if(L_countNow != L_countPrev) {
+  
+    //if(L_countNow != L_countPrev) {
           L_angPosNow = (2.0*PI*(double)L_countNow)/(double)N;
           
           L_angVelNow = ((double)L_angPosNow - (double)L_angPosPrev)/((double)L_deltaT/(double)micro);  // else, calculate angVel based on angPos
@@ -325,7 +356,7 @@ void updateLeftWheel() {
  
           L_angPosPrev = L_angPosNow;             
           L_angVelPrev = L_angVelNow; 
-    }
+    //}
 }
 
 /* Calculate new position and angle of robot*/
@@ -347,11 +378,24 @@ void calculatePositionandVel() {
   
     /*robot linear and rotational velocities */
     J_linVel = ((double)R_linVel + (double)L_linVel)/(double)2.0;
-    J_rotVel = ((double)L_linVel - (double)R_linVel)/(double)baseline; 
+    J_rotVel = ((double)R_linVel - (double)L_linVel)/(double)baseline; 
              
     /* set previous values to current values */
     x_prev = x_now;
     y_prev = y_now;
     phi_prev = phi_now; 
   
+}
+
+void printData() {
+  Serial.print(micros()/(double)1000000); 
+  Serial.print("\t"); Serial.print(desireForwardAngPos); 
+  Serial.print("\t"); Serial.print(R_angPosNow); 
+  Serial.print("\t"); Serial.print(L_angPosNow);
+  Serial.print("\t"); Serial.print(L_linVel);
+  Serial.print("\t"); Serial.print(R_linVel); 
+  /*Serial.print("\t"); Serial.print("R_angVelNow "); Serial.print(R_angVelNow);
+  Serial.print("\t"); Serial.print("R_angPosPrev "); Serial.print(R_angPosPrev); 
+  Serial.print("\t"); Serial.print("R_angPosNow "); Serial.print(R_angPosNow);*/
+  Serial.print("\n");
 }
