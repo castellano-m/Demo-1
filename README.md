@@ -10,3 +10,6 @@ A short description of the files in this master branch are as followed:
 Due to time constraints and hardware issues, the team recognizes that much work is needed to make the controls for the robot more robust for the final demo. The team hopes to fine tune how / when the angular position, angular velocity,  linear velocity of each wheel and how x-y-phi is calculated, and re-design the controls to be based off the x-y-phi of the robot as a whole, instead of the individual angular positioning of each wheel. When testing the robot to move certain distance, it was observed that different gain values were needed based on the specified distance (hence the large if-else statement in the setup() loop). The team understands that this design is not optimal to implement moving forward, and the team will eliminate this moving forward.
 
 * **stepExperiment.ino**: This program was used to perform the step reponse experiments of our robot. The experimental values from this code was used to design the controls of our system.
+* **Distance+AngleCalc.py**: Detects any aruco markers that appear within field of view of the camera. Calculated the distance and angle of center of the aruco marker from the center of the camera. 
+
+* **LCD**: Prints the angle and distance values calculated from **Distance+AngleCalc.py** to the LCD screen
