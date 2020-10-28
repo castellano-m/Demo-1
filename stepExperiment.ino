@@ -3,11 +3,11 @@
  *  
  * Title: StepExperimentAngular
  *  - Motor RW:   Channel A (yellow) = pin 2 (ISR)
- *                Channel B (white) = pin 12
+ *                Channel B (white) = pin 6
  *                Vcc (blue) = 5V on Arduino
  *              
  *  - Motor LW:   Channel A (yellow) = pin 3(ISR) 
- *                Channel B (white) = pin 13
+ *                Channel B (white) = pin 11
  *                Vcc (Blue) = pin 4 (set high)
  */
 
@@ -19,7 +19,7 @@
 #define B_RW            6            // channel B (white)
 
 /* LEFT MOTOR - Motor A */
-#define L_PWM           9           // PWM (black)
+#define L_PWM           9            // PWM (black)
 #define L_SIGN          7            // direction (red)
 #define A_LW            3            // channel A, ISR (orange)
 #define B_LW            11           // channel B (white)
@@ -79,9 +79,6 @@ double        scalePWM = .94;
 double        J_linVel = 0.0;                                                 // [in/s]     linear velocity                 
 double        J_rotVel = 0.0;
 
-//double x_posCalib = 4.16;                                                    // [in] calibration for front of camera to be 0 origin
-//double y_posCalib = 4.16;                                                    // [in] calibration for front of camera to be 0 origin 
-
 /*  R L 
  *  0 0 Forward
  *  0 1 CCW
@@ -125,14 +122,11 @@ void setup() {
   
   Serial.begin(115200);                                           // initialize serial monitor
 
-  //Serial.print("x [in]"); Serial.print("\t"); Serial.print("y [in]"); Serial.print("\t"); Serial.println("phi [in]");
-  //Serial.print("L_AngPos [rad] "); Serial.print("\t"); Serial.print("L_AngPrev [rad]"); Serial.print("\t"); Serial.print("L_deltaT [us]"); Serial.print("\t"); Serial.print("R_AngPrev [rad]"); Serial.print("\t");Serial.print("R_angPos [rad]"); Serial.print("\t"); Serial.print("R_deltaT [us]"); Serial.print("\t"); 
-  //Serial.print("time [ms]");Serial.print("\t"); Serial.print("L_angVel[rad/s]"); Serial.print("\t"); Serial.println("R_angVel [rad/s]");
   Serial.print("time [ms]");Serial.print("\t"); Serial.print("J_linVel[in/s]"); Serial.print("\t"); Serial.println("J_rotVel[rad/s]");  
 
   int timeStep = millis();
-  while(millis() < (timeStep + 1000));                            // wait 1 second before applying voltage step
-  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);      // assign direction to motors
+  while(millis() < (timeStep + 1000));                                     // wait 1 second before applying voltage step
+  digitalWrite(R_SIGN, R_dir);  digitalWrite(L_SIGN, L_dir);               // assign direction to motors
   analogWrite(R_PWM, scalePWM*127);      analogWrite(L_PWM, 127);          // write 50% duty cycle to each motor
   
 }
@@ -150,12 +144,8 @@ void loop() {
   }
        
     calculatePositionandVel();        /* update x, y, phi of robot */
-    //Serial.print("RW: "); Serial.print(R_countNow); Serial.print("\t"); Serial.print("LW: "); Serial.print(L_countNow); Serial.print("\t");
-    //Serial.print(x_now); Serial.print("\t"); Serial.print(y_now); Serial.print("\t"); Serial.println(phi_now); 
-
+   
   if((millis()%50 == 0) && (millis() <= 2800)){   /* sample velocity of both left and right wheels every 50 ms while time <= 2.8 s */
-    //Serial.print(L_angPosNow); Serial.print("\t"); Serial.print("\t"); Serial.print(L_angPosPrev); Serial.print("\t"); Serial.print("\t"); Serial.print(L_deltaT); Serial.print("\t"); Serial.print("\t");Serial.print(R_angPosNow); Serial.print("\t");Serial.print("\t"); Serial.print(R_angPosPrev); Serial.print("\t"); Serial.print("\t"); Serial.print(R_deltaT); Serial.print("\t"); Serial.print("\t"); 
-    //Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print("\t"); Serial.print(L_angVelNow); Serial.print("\t"); Serial.print("\t"); Serial.println(R_angVelNow);
     Serial.print((double)millis()/(double)1000);  Serial.print("\t"); Serial.print("\t"); Serial.print(J_linVel); Serial.print("\t"); Serial.print("\t"); Serial.println(J_rotVel);
   }
 
@@ -179,7 +169,6 @@ void updateRW_countsISR() {
 
     updateRightWheel();                   // update right wheel velocities and positions
     
-    //R_timePrev = micros();
 }
 
 /* update left encoder count values */
@@ -196,18 +185,13 @@ void updateLW_countsISR() {
     if (L_AChannelNow == L_BChannelNow) L_countNow -=2;
     else L_countNow +=2; 
 
-    updateLeftWheel();                    // update right wheel velocities and positions 
-    
-    //L_timePrev = micros();   
+    updateLeftWheel();                    // update right wheel velocities and positions  
 
 }
 
 /* update right wheel velocities and positions */
 void updateRightWheel() {
-    //R_timeNow = micros();                           // capture the time enter ISR
-    //R_deltaT = R_timeNow - R_timePrev;              // calculate time since last ISR
     
-    //if (R_deltaT > tooQuick){
           if(R_countNow != R_countPrev) {
                 R_angPosNow = (2.0*PI*(double)R_countNow)/(double)N;
                 
@@ -226,16 +210,12 @@ void updateRightWheel() {
                 R_angVelPrev = R_angVelNow; 
                 //R_timePrev = micros(); // capture time leaving ISR
           }
-    //}
 }
 
 
 /* update left wheel velocities and positions */
 void updateLeftWheel() {
-    //L_timeNow = micros();                           // capture the time enter ISR
-    //L_deltaT = L_timeNow - L_timePrev;              // calculate time since last ISR
 
-    //if (L_deltaT > tooQuick){
           if(L_countNow != L_countPrev) {
                 L_angPosNow = (2.0*PI*(double)L_countNow)/(double)N;
                 
@@ -245,9 +225,6 @@ void updateLeftWheel() {
                 } else {
                   L_angVelNow = ((double)L_angPosNow - (double)L_angPosPrev)/((double)L_deltaT/(double)micro);  // else, calculate angVel based on angPos
                 }
-
-                //Serial.print("R_deltaAngPos: "); Serial.println(R_angPosNow - R_angPosPrev);
-                 //Serial.print("L: "); Serial.println((double)L_angPosNow - (double)L_angPosPrev);
                 
                 L_linVel = (double)radius*(double)L_angVelNow;              // calculate linear velocity
 
@@ -255,7 +232,6 @@ void updateLeftWheel() {
                 L_angVelPrev = L_angVelNow; 
                 //L_timePrev = micros(); // captre time leaving ISR
           }
-    //}
 }
 
 /* Calculate new position and angle of robot*/
@@ -277,7 +253,6 @@ void calculatePositionandVel() {
   /* set previous values to current values */
   x_prev = x_now;
   y_prev = y_now;
-  phi_prev = phi_now;
-  //timePrev = micros();   
+  phi_prev = phi_now;   
   
 }
