@@ -1,5 +1,5 @@
 /* Name: Madison Heeg and Andrew Rouze
-   Date: October 12, 2020
+   Date: October 30, 2020
 
    Title: Inner Loop Controller
     - Motor RW:   Channel A (yellow) = pin 2 (ISR)
